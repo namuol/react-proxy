@@ -1,6 +1,18 @@
+import assign from 'lodash/object/assign';
+import difference from 'lodash/array/difference';
+
 import createPrototypeProxy from './createPrototypeProxy';
 import bindAutoBindMethods from './bindAutoBindMethods';
 import deleteUnknownAutoBindMethods from './deleteUnknownAutoBindMethods';
+
+const ignoreSpecialStatics = (() => {
+  const staticsToIgnore = ['__reactPatchProxy', 'type', 'displayName'];
+  return n => staticsToIgnore.indexOf(n) < 0;
+}());
+
+function shallowEquals(objectA, objectB) {
+  return difference(Object.getOwnPropertyNames(objectA), Object.getOwnPropertyNames(objectB)).length === 0;
+}
 
 export default function proxyClass(InitialClass) {
   // Prevent double wrapping.
@@ -18,6 +30,47 @@ export default function proxyClass(InitialClass) {
       return getCurrentClass().apply(this, arguments);
     }`
   )(() => CurrentClass);
+
+  const dynamicStatics = {};
+
+  function updateStatics(NextClass) {
+    const nextNames = Object.getOwnPropertyNames(NextClass).filter(ignoreSpecialStatics);
+    const currentNames = Object.getOwnPropertyNames(ProxyClass).filter(ignoreSpecialStatics);
+
+    const addedNames = difference(nextNames, currentNames);
+
+    addedNames.forEach((name) => {
+      const originalDesc = Object.getOwnPropertyDescriptor(NextClass, name) || {};
+      
+      const {
+        enumerable = false,
+        configurable = true
+      } = originalDesc;
+
+      const gettable = !!originalDesc.get || originalDesc.value;
+      const settable = !!originalDesc.set || originalDesc.writable;
+      
+      const descriptor = {
+        enumerable,
+        configurable,
+      };
+
+      if (gettable) {
+        descriptor.get = () => {
+          return dynamicStatics.hasOwnProperty(name) ? dynamicStatics[name] : CurrentClass[name];
+        };
+      }
+
+      if (settable) {
+        descriptor.set = (val) => {
+          CurrentClass[name] = val;
+          dynamicStatics[name] = val;
+        };
+      }
+
+      Object.defineProperty(ProxyClass, name, descriptor);
+    });
+  }
 
   // Point proxy constructor to the proxy prototype
   ProxyClass.prototype = prototypeProxy.get();
@@ -46,6 +99,8 @@ export default function proxyClass(InitialClass) {
 
     // Try to infer displayName
     ProxyClass.displayName = NextClass.name || NextClass.displayName;
+
+    updateStatics(NextClass);
 
     // We might have added new methods that need to be auto-bound
     mountedInstances.forEach(bindAutoBindMethods);

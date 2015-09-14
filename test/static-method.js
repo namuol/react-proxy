@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import createShallowRenderer from './helpers/createShallowRenderer';
 import expect from 'expect';
 import { createProxy } from '../src';
+import difference from 'lodash/array/difference';
 
 const fixtures = {
   modern: {
@@ -157,6 +158,16 @@ describe('static method', () => {
         expect(() => instance.forceUpdate()).toThrow();
         expect(() => renderer.render(<Proxy />)).toThrow();
         expect(Proxy.getAnswer).toEqual(undefined);
+      });
+
+      it('preserves the behavior of `Component.hasOwnProperty(...)`', () => {
+        const proxy = createProxy(StaticMethod);
+        const Proxy = proxy.get();
+        
+        const proxyFields = new Set(difference(Object.getOwnPropertyNames(Proxy), ['__reactPatchProxy', 'displayName']));
+        const expectedFields = new Set(Object.getOwnPropertyNames(StaticMethod));
+
+        expect(proxyFields).toEqual(expectedFields);
       });
     });
   });
