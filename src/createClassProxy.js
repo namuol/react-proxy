@@ -9,10 +9,6 @@ const ignoreSpecialStatics = (() => {
   return n => staticsToIgnore.indexOf(n) < 0;
 }());
 
-function shallowEquals(objectA, objectB) {
-  return difference(Object.getOwnPropertyNames(objectA), Object.getOwnPropertyNames(objectB)).length === 0;
-}
-
 export default function proxyClass(InitialClass) {
   // Prevent double wrapping.
   // Given a proxy class, return the existing proxy managing it.
