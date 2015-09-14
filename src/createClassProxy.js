@@ -1,4 +1,3 @@
-import assign from 'lodash/object/assign';
 import difference from 'lodash/array/difference';
 
 import createPrototypeProxy from './createPrototypeProxy';
